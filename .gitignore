@@ -1,0 +1,7 @@
+# Project exclude paths
+/cmake-build-debug/
+/CMakeLists.txt
+/interpreter.o
+/mysh.exe
+/shell.o
+/shellmemory.o
