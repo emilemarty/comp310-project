@@ -150,7 +150,7 @@ int schedule() {
             snprintf(buffer, 18, "%010dline%03d", cur->PID, i);
             errCode = parseInput(mem_get_value(buffer));
         }
-        for (int i = 0; i < length; i++) {
+        for (int i = 0; i < length; i++) {  // Clean-up: remove script source code from memory
             snprintf(buffer, 18, "%010dline%03d", cur->PID, i);
             mem_delete_var(buffer);
         }

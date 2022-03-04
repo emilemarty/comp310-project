@@ -1,6 +1,6 @@
 typedef struct PCB {
     int PID;
-    char *start;      // spot in memory where instructions begin
+    char start[18];   // spot in memory where instructions begin (format: ##########line###)
     int current;      // current instruction to execute
     int length;
     struct PCB *nextProc; // next PCB in the ready queue
