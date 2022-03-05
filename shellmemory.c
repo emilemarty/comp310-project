@@ -37,6 +37,13 @@ char *extract(char *model) {
     return strdup(value);
 }
 
+int MIN(int a, int b) {
+    if (b < a)
+        return b;
+    else
+        return a;
+}
+
 // Shell memory functions
 
 void mem_init() {
@@ -131,30 +138,82 @@ void readyQueue_init() {
     head.nextProc = NULL;
 }
 
-void enqueue(PCB *process) {
+void enqueue(PCB *process, int policy) {
     PCB *cur = &head;
-    while (cur->nextProc != NULL) {
-        cur = cur->nextProc;
+    if (policy == 2) {  // SJF: order the ready list by (increasing) process length
+        int inserted = 0;
+        while (cur->nextProc != NULL) {
+            PCB *prev = cur;
+            cur = cur->nextProc;
+            if(process->length < cur->length) {
+                prev->nextProc = process;
+                process->nextProc = cur;
+                inserted = 1; break;
+            }
+        }
+        if (inserted == 0)
+            cur->nextProc = process;
     }
-    cur->nextProc = process;
+    else {  // append to end of queue
+        while (cur->nextProc != NULL) {
+            cur = cur->nextProc;
+        }
+        cur->nextProc = process;
+    }
 }
 
-int schedule() {
-    int errCode = 0;
+void dequeue() {
+    if (head.nextProc == NULL)
+        return;
+    else {
+        PCB *cur = head.nextProc;
+        head.nextProc = cur->nextProc;
+        cur->nextProc = NULL;
+    }
+}
+
+int schedule(int policy) {
     char buffer[18];
     PCB *cur = &head;
-    while (cur->nextProc != NULL) {
-        cur = cur->nextProc;
-        int length = cur->length;
-        for (int i = cur->current; i < length; i++) {
+
+
+    if (cur->nextProc == NULL) {    // base case
+        return 0;
+    }
+    cur = cur->nextProc;
+    int length = cur->length;
+
+    if (policy == 3) {      // Round-robin
+        int startAt = cur->current;
+        for(int i = startAt; i < MIN(startAt+2, length); i++) {
             snprintf(buffer, 18, "%010dline%03d", cur->PID, i);
-            errCode = parseInput(mem_get_value(buffer));
+            parseInput(mem_get_value(buffer));
         }
-        for (int i = 0; i < length; i++) {  // Clean-up: remove script source code from memory
-            snprintf(buffer, 18, "%010dline%03d", cur->PID, i);
-            mem_delete_var(buffer);
+        if(startAt+2 >= length) {   // program complete
+            dequeue();
+        }
+        else {
+            cur->current = startAt+2;
+            dequeue();
+            enqueue(cur, policy);
         }
     }
-    head.nextProc = NULL;
-    return errCode;
+    else {
+        for (int i = 0; i < length; i++) {
+            snprintf(buffer, 18, "%010dline%03d", cur->PID, i);
+            parseInput(mem_get_value(buffer));
+        }
+        dequeue();
+    }
+
+    return schedule(policy);
+}
+
+void cleanup(PCB *process) {
+    char buffer[18];
+    int length = process->length;
+    for (int i = 0; i < length; i++) {  // Clean-up: remove script source code from memory
+        snprintf(buffer, 18, "%010dline%03d", process->PID, i);
+        mem_delete_var(buffer);
+    }
 }

@@ -16,6 +16,8 @@ PCB *PCB_init(PCB *process);
 
 void readyQueue_init();
 
-void enqueue(PCB *process);
+void enqueue(PCB *process, int policy);
 
-int schedule();
+int schedule(int policy);
+
+void cleanup(PCB *process);
