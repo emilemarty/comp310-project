@@ -1,9 +1,9 @@
-#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <time.h>
 #include "shellmemory.h"
 #include "shell.h"
+
+int counter = 0;
 
 struct memory_struct {
     char *var;
@@ -14,6 +14,12 @@ struct memory_struct shellmemory[1000];
 struct PCB head; // head of the priority queue
 
 // Helper functions
+void printMem() {
+    for (int i = 0; i < 1000; i++) {
+        printf("[%u]\t%s\t%s\n", i, shellmemory[i].var, shellmemory[i].value);
+    }
+}
+
 int match(char *model, char *var) {
     int i, len = strlen(var), matchCount = 0;
     for (i = 0; i < len; i++)
@@ -108,27 +114,8 @@ char *mem_get_value(char *var_in) {
 // Scheduler functions
 
 PCB *PCB_init(PCB *process) {
-    srand(time(NULL));
-    int pass = 0;
-    int random;
-
-    while (pass == 0) {
-        random = rand();
-        PCB *cur = head.nextProc;
-        if (cur == NULL)
-            break;
-        while (cur != NULL) {
-            if (cur->PID != random) {
-                pass = 1;
-            } else {
-                pass = 0;
-                break;
-            }
-            cur = cur->nextProc;
-        }
-    }
-
-    process->PID = random;
+    process->PID = counter;
+    counter++;
     process->nextProc = NULL;
 
     return process;
