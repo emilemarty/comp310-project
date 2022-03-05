@@ -17,11 +17,15 @@ int set(char *var, char *value);
 
 int print(char *var);
 
+int policyCheck(char *policy);
+
 int run(char *script);
 
 int badcommandTooManyTokens();
 
 int badcommandFileDoesNotExist();
+
+int exec(char *scripts[3], int length, int policy);
 
 // Interpret commands and their arguments
 int interpreter(char *command_args[], int args_size) {
@@ -100,25 +104,39 @@ int interpreter(char *command_args[], int args_size) {
     } else if (strcmp(command_args[0], "exec") == 0) {
         if (args_size > 5)
             return badcommandTooManyTokens();
+        if (args_size < 3)
+            return badcommand();
 
-        switch (args_size) {
-            case 3:
-
-                break;
-
-            case 4:
-
-                break;
-
-            case 5:
-
-                break;
-
-            default:
-                badcommand();
+        int policy = policyCheck(command_args[args_size - 1]);
+        if (policy < 0) {
+            printf("%s\n", "Bad command: Incorrect policy name");
+            return 1;
         }
-
-        return run(command_args[1]);
+        if (args_size == 4) {
+            if (strcmp(command_args[1], command_args[2]) == 0) {
+                printf("%s\n", "Bad command: Filenames must be different");
+                return 1;
+            }
+        }
+        if (args_size == 5) {
+            if (strcmp(command_args[1], command_args[2]) == 0) {
+                printf("%s\n", "Bad command: Filenames must be different");
+                return 1;
+            }
+            if (strcmp(command_args[1], command_args[3]) == 0) {
+                printf("%s\n", "Bad command: Filenames must be different");
+                return 1;
+            }
+            if (strcmp(command_args[2], command_args[3]) == 0) {
+                printf("%s\n", "Bad command: Filenames must be different");
+                return 1;
+            }
+        }
+        char* scripts[3] = {"none", "none", "none"};
+        for (int k = 0; k < args_size-2; k++) {
+            strcpy(scripts[k], command_args[k+1]);
+        }
+        return exec(scripts, args_size-2, policy);
     } else
         return badcommand();
 }
@@ -206,7 +224,10 @@ int run(char *script) {
     fgets(line, 999, p);
     while (1) {
         snprintf(buffer, 18, "%010dline%03d", newProcess.PID, line_number);
-        mem_set_value(buffer, line);
+        if (mem_set_value(buffer, line) == 0) {
+            printf("%s\n", "Error: shell ran out of memory");
+            return 4;
+        }
         if (line_number == 0) {
             newProcess.current = line_number;
             strcpy(newProcess.start, buffer);
@@ -230,5 +251,59 @@ int run(char *script) {
     enqueue(&newProcess, 1);
     int errCode = schedule(1);
     cleanup(&newProcess);
+    return errCode;
+}
+
+int exec(char *scripts[3], int length, int policy) {
+    struct PCB newProcess[3];
+    for (int i = 0; i < length; i++) {
+        PCB cur = newProcess[i];
+        PCB_init(&cur);
+    }
+
+    for (int i = 0; i < length; i++) {
+        int line_number = 0;
+        char line[1000];
+        char buffer[18];
+        FILE *p = fopen(scripts[i], "rt"); // the program is in a file
+
+        if (p == NULL) {
+            return badcommandFileDoesNotExist();
+        }
+
+        fgets(line, 999, p);
+        while (1) {
+            snprintf(buffer, 18, "%010dline%03d", newProcess[i].PID, line_number);
+            if (mem_set_value(buffer, line) == 0) {
+                printf("%s\n", "Error: shell ran out of memory");
+                return 4;
+            }
+            if (line_number == 0) {
+                newProcess[i].current = line_number;
+                strcpy(newProcess[i].start, buffer);
+            }
+            line_number++;
+
+            memset(line, 0, sizeof(line));
+            memset(buffer, 0, sizeof(buffer));
+            if (feof(p)) {
+                break;
+            }
+            fgets(line, 999, p);
+        }
+        fclose(p);
+        newProcess[i].length = line_number;
+    }
+
+    for (int i = 0; i < length; i++) {
+        PCB cur = newProcess[i];
+        enqueue(&cur, policy);
+    }
+    int errCode = schedule(policy);
+    for (int i = 0; i < length; i++) {
+        PCB cur = newProcess[i];
+        cleanup(&cur);
+    }
+
     return errCode;
 }
