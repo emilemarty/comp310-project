@@ -134,7 +134,7 @@ int interpreter(char *command_args[], int args_size) {
         }
         char* scripts[3] = {"none", "none", "none"};
         for (int k = 0; k < args_size-2; k++) {
-            strcpy(scripts[k], command_args[k+1]);
+            scripts[k] = command_args[k+1];
         }
         return exec(scripts, args_size-2, policy);
     } else
@@ -255,10 +255,13 @@ int run(char *script) {
 }
 
 int exec(char *scripts[3], int length, int policy) {
-    struct PCB newProcess[3];
+    struct PCB proc1;
+    struct PCB proc2;
+    struct PCB proc3;
+    struct PCB *newProcess[3] = {&proc1, &proc2, &proc3};
+
     for (int i = 0; i < length; i++) {
-        PCB cur = newProcess[i];
-        PCB_init(&cur);
+        PCB_init(newProcess[i]);
     }
 
     for (int i = 0; i < length; i++) {
@@ -273,14 +276,14 @@ int exec(char *scripts[3], int length, int policy) {
 
         fgets(line, 999, p);
         while (1) {
-            snprintf(buffer, 18, "%010dline%03d", newProcess[i].PID, line_number);
+            snprintf(buffer, 18, "%010dline%03d", newProcess[i]->PID, line_number);
             if (mem_set_value(buffer, line) == 0) {
                 printf("%s\n", "Error: shell ran out of memory");
                 return 4;
             }
             if (line_number == 0) {
-                newProcess[i].current = line_number;
-                strcpy(newProcess[i].start, buffer);
+                newProcess[i]->current = line_number;
+                strcpy(newProcess[i]->start, buffer);
             }
             line_number++;
 
@@ -292,17 +295,15 @@ int exec(char *scripts[3], int length, int policy) {
             fgets(line, 999, p);
         }
         fclose(p);
-        newProcess[i].length = line_number;
+        newProcess[i]->length = line_number;
     }
 
     for (int i = 0; i < length; i++) {
-        PCB cur = newProcess[i];
-        enqueue(&cur, policy);
+        enqueue(newProcess[i], policy);
     }
     int errCode = schedule(policy);
     for (int i = 0; i < length; i++) {
-        PCB cur = newProcess[i];
-        cleanup(&cur);
+        cleanup(newProcess[i]);
     }
 
     return errCode;
