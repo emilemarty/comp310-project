@@ -132,11 +132,11 @@ int interpreter(char *command_args[], int args_size) {
                 return 1;
             }
         }
-        char* scripts[3] = {"none", "none", "none"};
-        for (int k = 0; k < args_size-2; k++) {
-            scripts[k] = command_args[k+1];
+        char *scripts[3] = {"none", "none", "none"};
+        for (int k = 0; k < args_size - 2; k++) {
+            scripts[k] = command_args[k + 1];
         }
-        return exec(scripts, args_size-2, policy);
+        return exec(scripts, args_size - 2, policy);
     } else
         return badcommand();
 }
@@ -296,6 +296,7 @@ int exec(char *scripts[3], int length, int policy) {
         }
         fclose(p);
         newProcess[i]->length = line_number;
+        newProcess[i]->score = line_number;
     }
 
     for (int i = 0; i < length; i++) {
@@ -305,6 +306,5 @@ int exec(char *scripts[3], int length, int policy) {
     for (int i = 0; i < length; i++) {
         cleanup(newProcess[i]);
     }
-
     return errCode;
 }

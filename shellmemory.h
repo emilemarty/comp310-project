@@ -3,8 +3,13 @@ typedef struct PCB {
     char start[18];   // spot in memory where instructions begin (format: ##########line###)
     int current;      // current instruction to execute
     int length;
+    int score;
     struct PCB *nextProc; // next PCB in the ready queue
 } PCB;
+
+void printMem();
+
+void printQueue();
 
 void mem_init();
 

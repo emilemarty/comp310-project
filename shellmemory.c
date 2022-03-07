@@ -20,6 +20,16 @@ void printMem() {
     }
 }
 
+void printQueue() {
+    struct PCB *cur = &head;
+    printf("\t Ready Queue: \nHead\n");
+    while (cur->nextProc != NULL) {
+        cur = cur->nextProc;
+        printf("[PID = %u]    Current instruction = %u    Length = %u    Score = %i   \n",
+               cur->PID, cur->current, cur->length, cur->score);
+    }
+}
+
 int match(char *model, char *var) {
     int i, len = strlen(var), matchCount = 0;
     for (i = 0; i < len; i++)
@@ -132,16 +142,30 @@ void enqueue(PCB *process, int policy) {
         while (cur->nextProc != NULL) {
             PCB *prev = cur;
             cur = cur->nextProc;
-            if(process->length < cur->length) {
+            if (process->length < cur->length) {
                 prev->nextProc = process;
                 process->nextProc = cur;
-                inserted = 1; break;
+                inserted = 1;
+                break;
             }
         }
         if (inserted == 0)
             cur->nextProc = process;
-    }
-    else {  // append to end of queue
+    } else if (policy == 4) {  // AGING: order the ready list by (increasing) process score
+        int inserted = 0;
+        while (cur->nextProc != NULL) {
+            PCB *prev = cur;
+            cur = cur->nextProc;
+            if (process->score < cur->score) {
+                prev->nextProc = process;
+                process->nextProc = cur;
+                inserted = 1;
+                break;
+            }
+        }
+        if (inserted == 0)
+            cur->nextProc = process;
+    } else {  // append to end of queue
         while (cur->nextProc != NULL) {
             cur = cur->nextProc;
         }
@@ -163,7 +187,6 @@ int schedule(int policy) {
     char buffer[18];
     PCB *cur = &head;
 
-
     if (cur->nextProc == NULL) {    // base case
         return 0;
     }
@@ -172,20 +195,52 @@ int schedule(int policy) {
 
     if (policy == 3) {      // Round-robin
         int startAt = cur->current;
-        for(int i = startAt; i < MIN(startAt+2, length); i++) {
+        for (int i = startAt; i < MIN(startAt + 2, length); i++) {
             snprintf(buffer, 18, "%010dline%03d", cur->PID, i);
             parseInput(mem_get_value(buffer));
         }
-        if(startAt+2 >= length) {   // program complete
+        if (startAt + 2 >= length) {   // program complete
             dequeue();
-        }
-        else {
-            cur->current = startAt+2;
+        } else {
+            cur->current = startAt + 2;
             dequeue();
             enqueue(cur, policy);
         }
     }
-    else {
+    if (policy == 4) {      // Aging
+        int startAt = cur->current;
+
+        snprintf(buffer, 18, "%010dline%03d", cur->PID, startAt);
+        parseInput(mem_get_value(buffer));
+
+        if (startAt + 1 >= length) {   // program complete
+            dequeue();
+        } else {
+            cur->current = startAt + 1;
+            PCB *temp = cur;
+            int promote = 0;
+            int curAge = temp->score;
+
+            while (cur->nextProc != NULL) {
+                cur = cur->nextProc;
+                int age = cur->score;
+                if (age > 0)
+                    cur->score = age - 1;
+            }
+            cur = temp;
+            while (cur->nextProc != NULL) {
+                cur = cur->nextProc;
+                if (cur->score < curAge) {
+                    promote = 1;
+                    break;
+                }
+            }
+            if (promote == 1) {
+                dequeue();
+                enqueue(temp, policy);
+            }
+        }
+    } else {
         for (int i = 0; i < length; i++) {
             snprintf(buffer, 18, "%010dline%03d", cur->PID, i);
             parseInput(mem_get_value(buffer));
