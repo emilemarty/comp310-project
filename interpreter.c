@@ -152,7 +152,7 @@ print VAR		Displays the STRING assigned to VAR\n \
 my_ls			Lists all the files present in the current directory\n \
 run SCRIPT.TXT		Executes the file SCRIPT.TXT\n \
 exec prog1 prog2	Executes up to 3 concurrent programs, according to a \n \
-     prog3 POLICY	given scheduling policy: FCFS, SJF, RR, or AGING";
+     prog3 POLICY	given scheduling policy: FCFS, SJF, RR, or AGING \n";
     printf("%s\n", help_string);
     return 0;
 }
