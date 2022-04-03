@@ -206,8 +206,7 @@ int schedule(int policy) {
             dequeue();
             enqueue(cur, policy);
         }
-    }
-    if (policy == 4) {      // Aging
+    } else if (policy == 4) {      // Aging
         int startAt = cur->current;
 
         snprintf(buffer, 18, "%010dline%03d", cur->PID, startAt);
