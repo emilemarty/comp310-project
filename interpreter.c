@@ -51,6 +51,7 @@ int interpreter(char *command_args[], int args_size) {
         // quit
         if (args_size != 1)
             return badcommand();
+        remove("backing_store");
         return quit();
     } else if (strcmp(command_args[0], "set") == 0) {
         // set
@@ -97,6 +98,11 @@ int interpreter(char *command_args[], int args_size) {
         if (args_size != 2)
             return badcommand();
         return print(command_args[1]);
+    } else if (strcmp(command_args[0], "resetmem") == 0) {
+        if (args_size != 1)
+            return badcommand();
+        clear_variables();
+        return 0;
     } else if (strcmp(command_args[0], "run") == 0) {
         if (args_size != 2)
             return badcommand();
@@ -111,26 +117,6 @@ int interpreter(char *command_args[], int args_size) {
         if (policy < 0) {
             printf("%s\n", "Bad command: Incorrect policy name");
             return 1;
-        }
-        if (args_size == 4) {
-            if (strcmp(command_args[1], command_args[2]) == 0) {
-                printf("%s\n", "Bad command: Filenames must be different");
-                return 1;
-            }
-        }
-        if (args_size == 5) {
-            if (strcmp(command_args[1], command_args[2]) == 0) {
-                printf("%s\n", "Bad command: Filenames must be different");
-                return 1;
-            }
-            if (strcmp(command_args[1], command_args[3]) == 0) {
-                printf("%s\n", "Bad command: Filenames must be different");
-                return 1;
-            }
-            if (strcmp(command_args[2], command_args[3]) == 0) {
-                printf("%s\n", "Bad command: Filenames must be different");
-                return 1;
-            }
         }
         char *scripts[3] = {"none", "none", "none"};
         for (int k = 0; k < args_size - 2; k++) {
@@ -264,8 +250,9 @@ int exec(char *scripts[3], int length, int policy) {
         PCB_init(newProcess[i]);
     }
 
+    FILE *b = fopen("backing_store", "w");
+    int line_number = 0;
     for (int i = 0; i < length; i++) {
-        int line_number = 0;
         char line[1000];
         char buffer[18];
         FILE *p = fopen(scripts[i], "rt"); // the program is in a file
@@ -274,29 +261,24 @@ int exec(char *scripts[3], int length, int policy) {
             return badcommandFileDoesNotExist();
         }
 
+        int start = line_number;
+        newProcess[i]->current = start;
         fgets(line, 999, p);
         while (1) {
-            snprintf(buffer, 18, "%010dline%03d", newProcess[i]->PID, line_number);
-            if (mem_set_value(buffer, line) == 0) {
-                printf("%s\n", "Error: shell ran out of memory");
-                return 4;
-            }
-            if (line_number == 0) {
-                newProcess[i]->current = line_number;
-                strcpy(newProcess[i]->start, buffer);
-            }
+            fputs(line, b);
             line_number++;
-
             memset(line, 0, sizeof(line));
-            memset(buffer, 0, sizeof(buffer));
+
             if (feof(p)) {
                 break;
             }
             fgets(line, 999, p);
         }
         fclose(p);
-        newProcess[i]->length = line_number;
-        newProcess[i]->score = line_number;
+        int length = line_number - start;
+        newProcess[i]->length = length;
+        newProcess[i]->score = length;
+        newProcess[i]->pagetable = malloc(length * sizeof(int));
     }
 
     for (int i = 0; i < length; i++) {
@@ -304,7 +286,7 @@ int exec(char *scripts[3], int length, int policy) {
     }
     int errCode = schedule(policy);
     for (int i = 0; i < length; i++) {
-        cleanup(newProcess[i]);
+        free(newProcess[i]->pagetable);
     }
     return errCode;
 }

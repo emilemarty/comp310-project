@@ -10,6 +10,7 @@ struct memory_struct {
     char *value;
 };
 
+int partition = 600;
 struct memory_struct shellmemory[1000];
 struct PCB head; // head of the priority queue
 
@@ -255,5 +256,12 @@ void cleanup(PCB *process) {
     for (int i = 0; i < length; i++) {  // Clean-up: remove script source code from memory
         snprintf(buffer, 18, "%010dline%03d", process->PID, i);
         mem_delete_var(buffer);
+    }
+}
+
+void clear_variables() {
+    for (int i = partition; i < 1000; i++) {
+        shellmemory[i].var = "none";
+        shellmemory[i].value = "none";
     }
 }

@@ -5,6 +5,7 @@ typedef struct PCB {
     int length;
     int score;
     struct PCB *nextProc; // next PCB in the ready queue
+    int *pagetable;
 } PCB;
 
 void printMem();
@@ -26,3 +27,5 @@ void enqueue(PCB *process, int policy);
 int schedule(int policy);
 
 void cleanup(PCB *process);
+
+void clear_variables();
