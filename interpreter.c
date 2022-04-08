@@ -136,6 +136,7 @@ set VAR STRING		Assigns a value to shell memory\n \
 echo STRING		Displays the STRING passed to echo\n \
 print VAR		Displays the STRING assigned to VAR\n \
 my_ls			Lists all the files present in the current directory\n \
+resetmem		    Deletes the content of the variable store.\n \
 run SCRIPT.TXT		Executes the file SCRIPT.TXT\n \
 exec prog1 prog2	Executes up to 3 concurrent programs, according to a \n \
      prog3 POLICY	given scheduling policy: FCFS, SJF, RR, or AGING \n";
@@ -194,6 +195,7 @@ int policyCheck(char *policy) {
     return -1;
 }
 
+// TODO: Refactor run() to use paging infrastructure
 int run(char *script) {
     struct PCB newProcess;
     PCB_init(&newProcess);
@@ -254,7 +256,6 @@ int exec(char *scripts[3], int length, int policy) {
     int line_number = 0;
     for (int i = 0; i < length; i++) {
         char line[1000];
-        char buffer[18];
         FILE *p = fopen(scripts[i], "rt"); // the program is in a file
 
         if (p == NULL) {
@@ -278,7 +279,10 @@ int exec(char *scripts[3], int length, int policy) {
         int length = line_number - start;
         newProcess[i]->length = length;
         newProcess[i]->score = length;
-        newProcess[i]->pagetable = malloc(length * sizeof(int));
+        newProcess[i]->pagetable = malloc(((length + 2) / 3) * sizeof(int));   // There are ceiling(length/3) pages
+        for (int j = 0; j < (length + 2) / 3; j++) {
+            newProcess[i]->pagetable[j] = -1;
+        }
     }
 
     for (int i = 0; i < length; i++) {
