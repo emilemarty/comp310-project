@@ -1,6 +1,6 @@
 typedef struct PCB {
     int PID;
-    char start[18];   // spot in memory where instructions begin (format: ##########line###)
+    int start;   // spot in memory where instructions begin (format: ##########line###)
     int current;      // current instruction to execute
     int length;
     int score;
@@ -15,8 +15,12 @@ void printQueue();
 void mem_init();
 
 char *mem_get_value(char *var);
-
+int mem_delete_var(char *var_in);
 int mem_set_value(char *var, char *value);
+
+int frame_set(int PID, int page_num, char *line1, char *line2, char *line3);
+int frame_delete(int frame_num);
+void frame_load(PCB *process, int page_num);
 
 PCB *PCB_init(PCB *process);
 

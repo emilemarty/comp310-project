@@ -197,6 +197,7 @@ int policyCheck(char *policy) {
 
 // TODO: Refactor run() to use paging infrastructure
 int run(char *script) {
+    /**
     struct PCB newProcess;
     PCB_init(&newProcess);
 
@@ -231,6 +232,7 @@ int run(char *script) {
             break;
         }
         fgets(line, 999, p);
+
     }
 
     fclose(p);
@@ -240,6 +242,8 @@ int run(char *script) {
     int errCode = schedule(1);
     cleanup(&newProcess);
     return errCode;
+     */
+     return 0;
 }
 
 int exec(char *scripts[3], int length, int policy) {
@@ -263,7 +267,8 @@ int exec(char *scripts[3], int length, int policy) {
         }
 
         int start = line_number;
-        newProcess[i]->current = start;
+        newProcess[i]->start = start;
+        newProcess[i]->current = 0;
         fgets(line, 999, p);
         while (1) {
             fputs(line, b);
@@ -284,10 +289,35 @@ int exec(char *scripts[3], int length, int policy) {
             newProcess[i]->pagetable[j] = -1;
         }
     }
-
+    fclose(b);
+    FILE *fp = fopen("backing_store", "rt");
     for (int i = 0; i < length; i++) {
+        int start = newProcess[i]->start;
+        char line1[1000];
+        char line2[1000];
+        char line3[1000];
+        for (int j = 0; j < start; j++) {
+            fgets(line1,999,fp);
+        }
+        memset(line1, 0, sizeof(line1));
+        fgets(line1, 999, fp);
+        fgets(line2, 999, fp);
+        fgets(line3, 999, fp);
+        int loc = frame_set(newProcess[i]->PID, 0, line1, line2, line3);
+        newProcess[i]->pagetable[0] = loc;
+        if (!feof(fp)) {
+            memset(line1, 0, sizeof(line1));
+            memset(line2, 0, sizeof(line1));
+            memset(line3, 0, sizeof(line1));
+            fgets(line1, 999, fp);
+            fgets(line2, 999, fp);
+            fgets(line3, 999, fp);
+            int loc = frame_set(newProcess[i]->PID, 1, line1, line2, line3);
+            newProcess[i]->pagetable[1] = loc;
+        }
         enqueue(newProcess[i], policy);
     }
+    fclose(fp);
     int errCode = schedule(policy);
     for (int i = 0; i < length; i++) {
         free(newProcess[i]->pagetable);

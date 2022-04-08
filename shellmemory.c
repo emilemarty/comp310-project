@@ -1,5 +1,7 @@
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
+#include <stdlib.h>
 #include "shellmemory.h"
 #include "shell.h"
 
@@ -114,6 +116,87 @@ char *mem_get_value(char *var_in) {
     return "Variable does not exist";
 }
 
+int frame_set(int PID, int page_num, char *line1, char *line2, char *line3) {
+
+    char buffer[18];
+    snprintf(buffer, 18, "%010dline%03d", PID, page_num);
+    int i;
+    for (i = 0; i < partition; i = i + 3) {
+        if (strcmp(shellmemory[i].var, "none") == 0) {
+            shellmemory[i].var = strdup(buffer);
+            shellmemory[i + 1].var = strdup(buffer);
+            shellmemory[i + 2].var = strdup(buffer);
+
+            shellmemory[i].value = strdup(line1);
+            if (line2 == NULL)
+                shellmemory[i + 1].value = "none";
+            else
+                shellmemory[i + 1].value = strdup(line2);
+
+            if (line3 == NULL)
+                shellmemory[i + 2].value = "none";
+            else
+                shellmemory[i + 2].value = strdup(line3);
+
+            return i;
+        }
+    }
+    return -1;
+}
+
+int frame_delete(int frame_num) {
+    if (frame_num % 3 != 0)
+        return 0;
+    int i = frame_num;
+    shellmemory[i].var = "none";
+    shellmemory[i].value = "none";
+    shellmemory[i + 1].var = "none";
+    shellmemory[i + 1].value = "none";
+    shellmemory[i + 2].var = "none";
+    shellmemory[i + 2].value = "none";
+    return 1;
+}
+
+void frame_load(PCB *process, int page_num) {
+    srand((unsigned int) time(NULL));
+    FILE *fp = fopen("backing_store", "rt");
+    char line1[1000];
+    char line2[1000];
+    char line3[1000];
+    int start = process->start + (page_num * 3);
+    for (int j = 0; j < start; j++) {
+        fgets(line1, 999, fp);
+    }
+    memset(line1, 0, sizeof(line1));
+    fgets(line1, 999, fp);
+    fgets(line2, 999, fp);
+    fgets(line3, 999, fp);
+    int loc = frame_set(process->PID, 0, line1, line2, line3);
+    if (loc == -1) {    // Need to evict
+        printf("%s\n", "Page fault! Victim page contents:");
+        int r = rand() % (partition / 3);
+        printf("%s\n", shellmemory[r * 3].value);
+        printf("%s\n", shellmemory[r * 3 + 1].value);
+        printf("%s\n", shellmemory[r * 3 + 2].value);
+        char *token = strtok(shellmemory[r * 3].var, "line");
+        int PID = atoi(token);
+        token = strtok(shellmemory[r * 3].var, "line");
+        int index = atoi(token);
+        PCB *cur = &head;
+        while(cur != NULL) {
+            if (cur->PID == PID) {
+                cur->pagetable[index] = -1;
+                break;
+            }
+            cur = cur->nextProc;
+        }
+        frame_delete(r);
+        loc = frame_set(process->PID, 0, line1, line2, line3);
+        printf("%s\n", "End of victim page contents.");
+    }
+    process->pagetable[0] = loc;
+}
+
 // Scheduler functions
 
 PCB *PCB_init(PCB *process) {
@@ -186,58 +269,90 @@ int schedule(int policy) {
     cur = cur->nextProc;
     int length = cur->length;
 
+    int page_fault = 0;
+
     if (policy == 3) {      // Round-robin
         int startAt = cur->current;
-        for (int i = startAt; i < MIN(startAt + 2, length); i++) {
-            snprintf(buffer, 18, "%010dline%03d", cur->PID, i);
-            parseInput(mem_get_value(buffer));
+        int i;
+        for (i = startAt; i < MIN(startAt + 2, length); i++) {
+            int frame_num = cur->pagetable[i / 3];
+            if (frame_num == -1) {
+                page_fault = 1;
+                cur->current = i;
+                dequeue();
+                enqueue(cur, policy);
+                frame_load(cur, i / 3);
+                break;
+            } else
+                parseInput(shellmemory[frame_num + (i % 3)].value);
         }
-        if (startAt + 2 >= length) {   // program complete
-            dequeue();
-        } else {
-            cur->current = startAt + 2;
-            dequeue();
-            enqueue(cur, policy);
+        if (page_fault == 0) {
+            if (startAt + 2 >= length) {   // program complete
+                dequeue();
+            } else {
+                cur->current = startAt + 2;
+                dequeue();
+                enqueue(cur, policy);
+            }
         }
+        page_fault = 0;
     } else if (policy == 4) {      // Aging
         int startAt = cur->current;
-
-        snprintf(buffer, 18, "%010dline%03d", cur->PID, startAt);
-        parseInput(mem_get_value(buffer));
-
-        if (startAt + 1 >= length) {   // program complete
+        int frame_num = cur->pagetable[startAt / 3];
+        if (frame_num == -1) {
+            page_fault = 1;
+            cur->current = startAt;
             dequeue();
-        } else {
-            cur->current = startAt + 1;
-            PCB *temp = cur;
-            int promote = 0;
-            int curAge = temp->score;
+            enqueue(cur, policy);
+            frame_load(cur, startAt / 3);
+        } else
+            parseInput(shellmemory[frame_num + (startAt % 3)].value);
+        if (page_fault == 0) {
+            if (startAt + 1 >= length) {   // program complete
+                dequeue();
+            } else {
+                cur->current = startAt + 1;
+                PCB *temp = cur;
+                int promote = 0;
+                int curAge = temp->score;
 
-            while (cur->nextProc != NULL) {
-                cur = cur->nextProc;
-                int age = cur->score;
-                if (age > 0)
-                    cur->score = age - 1;
-            }
-            cur = temp;
-            while (cur->nextProc != NULL) {
-                cur = cur->nextProc;
-                if (cur->score < curAge) {
-                    promote = 1;
-                    break;
+                while (cur->nextProc != NULL) {
+                    cur = cur->nextProc;
+                    int age = cur->score;
+                    if (age > 0)
+                        cur->score = age - 1;
+                }
+                cur = temp;
+                while (cur->nextProc != NULL) {
+                    cur = cur->nextProc;
+                    if (cur->score < curAge) {
+                        promote = 1;
+                        break;
+                    }
+                }
+                if (promote == 1) {
+                    dequeue();
+                    enqueue(temp, policy);
                 }
             }
-            if (promote == 1) {
-                dequeue();
-                enqueue(temp, policy);
-            }
         }
+        page_fault = 0;
     } else {
         for (int i = 0; i < length; i++) {
-            snprintf(buffer, 18, "%010dline%03d", cur->PID, i);
-            parseInput(mem_get_value(buffer));
+            int frame_num = cur->pagetable[i / 3];
+            if (frame_num == -1) {
+                page_fault = 1;
+                cur->current = i;
+                dequeue();
+                enqueue(cur, policy);
+                frame_load(cur, i / 3);
+                break;
+            } else
+                parseInput(shellmemory[frame_num + (i % 3)].value);
         }
-        dequeue();
+        if (page_fault == 0)
+            dequeue();
+        page_fault = 0;
     }
     return schedule(policy);
 }
