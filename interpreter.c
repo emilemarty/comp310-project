@@ -292,33 +292,42 @@ int exec(char *scripts[3], int length, int policy) {
     }
     fclose(b);
     FILE *fp = fopen("backing_store", "rt");
+    char line1[1000];
+    char line2[1000];
+    char line3[1000];
     for (int i = 0; i < length; i++) {
         int start = newProcess[i]->start;
-        char line1[1000];
-        char line2[1000];
-        char line3[1000];
+        int procLength = newProcess[i]->length;
+        fseek(fp, 0, SEEK_SET);
         for (int j = 0; j < start; j++) {
             fgets(line1,999,fp);
         }
         memset(line1, 0, sizeof(line1));
+        memset(line2, 0, sizeof(line1));
+        memset(line3, 0, sizeof(line1));
         fgets(line1, 999, fp);
-        fgets(line2, 999, fp);
-        fgets(line3, 999, fp);
+        if (procLength >= 2)
+            fgets(line2, 999, fp);
+        if (procLength >= 3)
+            fgets(line3, 999, fp);
         int loc = frame_set(newProcess[i]->PID, 0, line1, line2, line3);
         newProcess[i]->pagetable[0] = loc;
-        if (!feof(fp)) {
+        if (procLength >= 4) {
             memset(line1, 0, sizeof(line1));
             memset(line2, 0, sizeof(line1));
             memset(line3, 0, sizeof(line1));
             fgets(line1, 999, fp);
-            fgets(line2, 999, fp);
-            fgets(line3, 999, fp);
+            if (procLength >= 5)
+                fgets(line2, 999, fp);
+            if (procLength >= 6)
+                fgets(line3, 999, fp);
             int loc = frame_set(newProcess[i]->PID, 1, line1, line2, line3);
             newProcess[i]->pagetable[1] = loc;
         }
         enqueue(newProcess[i], policy);
     }
     fclose(fp);
+    printMem();
     int errCode = schedule(policy);
     for (int i = 0; i < length; i++) {
         free(newProcess[i]->pagetable);

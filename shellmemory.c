@@ -117,9 +117,8 @@ char *mem_get_value(char *var_in) {
 }
 
 int frame_set(int PID, int page_num, char *line1, char *line2, char *line3) {
-
     char buffer[18];
-    snprintf(buffer, 18, "%010dline%03d", PID, page_num);
+    snprintf(buffer, 18, "%010dpage%03d", PID, page_num);
     int i;
     for (i = 0; i < partition; i = i + 3) {
         if (strcmp(shellmemory[i].var, "none") == 0) {
@@ -128,12 +127,11 @@ int frame_set(int PID, int page_num, char *line1, char *line2, char *line3) {
             shellmemory[i + 2].var = strdup(buffer);
 
             shellmemory[i].value = strdup(line1);
-            if (line2 == NULL)
+            if (strcmp("", line2) == 0)
                 shellmemory[i + 1].value = "none";
             else
                 shellmemory[i + 1].value = strdup(line2);
-
-            if (line3 == NULL)
+            if (strcmp("", line3) == 0)
                 shellmemory[i + 2].value = "none";
             else
                 shellmemory[i + 2].value = strdup(line3);
@@ -164,26 +162,35 @@ void frame_load(PCB *process, int page_num) {
     char line2[1000];
     char line3[1000];
     int start = process->start + (page_num * 3);
+    int length = process->length;
+    int loadCount = 0;
+    if (page_num + 1 == (length + 2) / 3)   // if we are loading the final page
+        loadCount = ((length - 1) % 3) + 1;
+    else
+        loadCount = 3;
+
     for (int j = 0; j < start; j++) {
         fgets(line1, 999, fp);
     }
     memset(line1, 0, sizeof(line1));
     fgets(line1, 999, fp);
-    fgets(line2, 999, fp);
-    fgets(line3, 999, fp);
-    int loc = frame_set(process->PID, 0, line1, line2, line3);
+    if (loadCount >= 2)
+        fgets(line2, 999, fp);
+    if (loadCount >= 3)
+        fgets(line3, 999, fp);
+    int loc = frame_set(process->PID, page_num, line1, line2, line3);
     if (loc == -1) {    // Need to evict
         printf("%s\n", "Page fault! Victim page contents:");
         int r = rand() % (partition / 3);
-        printf("%s\n", shellmemory[r * 3].value);
-        printf("%s\n", shellmemory[r * 3 + 1].value);
-        printf("%s\n", shellmemory[r * 3 + 2].value);
-        char *token = strtok(shellmemory[r * 3].var, "line");
+        printf("%s", shellmemory[r * 3].value);
+        printf("%s", shellmemory[r * 3 + 1].value);
+        printf("%s", shellmemory[r * 3 + 2].value);
+        char *token = strtok(shellmemory[r * 3].var, "page");
         int PID = atoi(token);
-        token = strtok(shellmemory[r * 3].var, "line");
+        token = strtok(NULL, "page");
         int index = atoi(token);
         PCB *cur = &head;
-        while(cur != NULL) {
+        while (cur != NULL) {
             if (cur->PID == PID) {
                 cur->pagetable[index] = -1;
                 break;
@@ -194,7 +201,8 @@ void frame_load(PCB *process, int page_num) {
         loc = frame_set(process->PID, 0, line1, line2, line3);
         printf("%s\n", "End of victim page contents.");
     }
-    process->pagetable[0] = loc;
+    process->pagetable[page_num] = loc;
+    fclose(fp);
 }
 
 // Scheduler functions
@@ -261,7 +269,6 @@ void dequeue() {
 
 int schedule(int policy) {
     PCB *cur = &head;
-
     if (cur->nextProc == NULL) {    // base case
         return 0;
     }
