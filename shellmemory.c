@@ -190,15 +190,15 @@ void frame_load(PCB *process, int page_num) {
         token = strtok(NULL, "page");
         int index = atoi(token);
         PCB *cur = &head;
-        while (cur != NULL) {
+        while (cur->nextProc != NULL) {
+            cur = cur->nextProc;
             if (cur->PID == PID) {
                 cur->pagetable[index] = -1;
                 break;
             }
-            cur = cur->nextProc;
         }
         frame_delete(r);
-        loc = frame_set(process->PID, 0, line1, line2, line3);
+        loc = frame_set(process->PID, page_num, line1, line2, line3);
         printf("%s\n", "End of victim page contents.");
     }
     process->pagetable[page_num] = loc;
@@ -344,14 +344,14 @@ int schedule(int policy) {
         }
         page_fault = 0;
     } else {
-        for (int i = 0; i < length; i++) {
+        for (int i = cur->current; i < length; i++) {
             int frame_num = cur->pagetable[i / 3];
             if (frame_num == -1) {
                 page_fault = 1;
                 cur->current = i;
+                frame_load(cur, i / 3);
                 dequeue();
                 enqueue(cur, policy);
-                frame_load(cur, i / 3);
                 break;
             } else
                 parseInput(shellmemory[frame_num + (i % 3)].value);

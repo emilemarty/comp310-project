@@ -195,55 +195,71 @@ int policyCheck(char *policy) {
     return -1;
 }
 
-// TODO: Refactor run() to use paging infrastructure
 int run(char *script) {
-    /**
     struct PCB newProcess;
     PCB_init(&newProcess);
 
     int line_number = 0;
     char line[1000];
-    char buffer[18];
     FILE *p = fopen(script, "rt"); // the program is in a file
+    FILE *b = fopen("backing_store", "w");
 
     if (p == NULL) {
         return badcommandFileDoesNotExist();
     }
 
     fgets(line, 999, p);
+    newProcess.start = 0;
+    newProcess.current = 0;
     while (1) {
-        snprintf(buffer, 18, "%010dline%03d", newProcess.PID, line_number);
-        if (mem_set_value(buffer, line) == 0) {
-            printf("%s\n", "Error: shell ran out of memory");
-            return 4;
-        }
-        if (line_number == 0) {
-            newProcess.current = line_number;
-            strcpy(newProcess.start, buffer);
-        }
+        fputs(line, b);
         line_number++;
-
-        // errCode = parseInput(line); // which calls interpreter()
-
         memset(line, 0, sizeof(line));
-        memset(buffer, 0, sizeof(buffer));
 
         if (feof(p)) {
             break;
         }
         fgets(line, 999, p);
-
     }
 
     fclose(p);
-    newProcess.length = line_number;
+    fclose(b);
+    int procLength = line_number;
+    newProcess.length = procLength;
+    newProcess.score = procLength;
+    newProcess.pagetable = malloc(((procLength + 2) / 3) * sizeof(int));   // There are ceiling(length/3) pages
+    for (int j = 0; j < (procLength + 2) / 3; j++) {
+        newProcess.pagetable[j] = -1;
+    }
 
+    FILE *fp = fopen("backing_store", "rt");
+    char line1[1000];
+    char line2[1000];
+    char line3[1000];
+    fgets(line1, 999, fp);
+    if (procLength >= 2)
+        fgets(line2, 999, fp);
+    if (procLength >= 3)
+        fgets(line3, 999, fp);
+    int loc = frame_set(newProcess.PID, 0, line1, line2, line3);
+    newProcess.pagetable[0] = loc;
+    if (procLength >= 4) {
+        memset(line1, 0, sizeof(line1));
+        memset(line2, 0, sizeof(line1));
+        memset(line3, 0, sizeof(line1));
+        fgets(line1, 999, fp);
+        if (procLength >= 5)
+            fgets(line2, 999, fp);
+        if (procLength >= 6)
+            fgets(line3, 999, fp);
+        int loc = frame_set(newProcess.PID, 1, line1, line2, line3);
+        newProcess.pagetable[1] = loc;
+    }
+    fclose(fp);
     enqueue(&newProcess, 1);
     int errCode = schedule(1);
     cleanup(&newProcess);
     return errCode;
-     */
-     return 0;
 }
 
 int exec(char *scripts[3], int length, int policy) {
@@ -282,11 +298,11 @@ int exec(char *scripts[3], int length, int policy) {
         }
         fputs("\n", b);
         fclose(p);
-        int length = line_number - start;
-        newProcess[i]->length = length;
-        newProcess[i]->score = length;
-        newProcess[i]->pagetable = malloc(((length + 2) / 3) * sizeof(int));   // There are ceiling(length/3) pages
-        for (int j = 0; j < (length + 2) / 3; j++) {
+        int procLength = line_number - start;
+        newProcess[i]->length = procLength;
+        newProcess[i]->score = procLength;
+        newProcess[i]->pagetable = malloc(((procLength + 2) / 3) * sizeof(int));   // There are ceiling(length/3) pages
+        for (int j = 0; j < (procLength + 2) / 3; j++) {
             newProcess[i]->pagetable[j] = -1;
         }
     }
@@ -300,7 +316,7 @@ int exec(char *scripts[3], int length, int policy) {
         int procLength = newProcess[i]->length;
         fseek(fp, 0, SEEK_SET);
         for (int j = 0; j < start; j++) {
-            fgets(line1,999,fp);
+            fgets(line1, 999, fp);
         }
         memset(line1, 0, sizeof(line1));
         memset(line2, 0, sizeof(line1));
@@ -327,7 +343,6 @@ int exec(char *scripts[3], int length, int policy) {
         enqueue(newProcess[i], policy);
     }
     fclose(fp);
-    printMem();
     int errCode = schedule(policy);
     for (int i = 0; i < length; i++) {
         free(newProcess[i]->pagetable);
