@@ -33,3 +33,6 @@ int schedule(int policy);
 void cleanup(PCB *process);
 
 void clear_variables();
+
+void history_write(int frame_number);
+int history_LRU();

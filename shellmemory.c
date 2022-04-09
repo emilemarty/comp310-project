@@ -13,6 +13,8 @@ struct memory_struct {
 };
 
 int partition = FRAMESIZE;
+int history_tail;
+int framehistory[FRAMESIZE];
 struct memory_struct shellmemory[1000];
 struct PCB head; // head of the priority queue
 
@@ -71,6 +73,10 @@ void mem_init() {
         shellmemory[i].var = "none";
         shellmemory[i].value = "none";
     }
+    for (i = 0; i < partition/3; i++) {
+        framehistory[i] = -1;
+    }
+    history_tail = 0;
 }
 
 // Set key value pair
@@ -181,7 +187,7 @@ void frame_load(PCB *process, int page_num) {
     int loc = frame_set(process->PID, page_num, line1, line2, line3);
     if (loc == -1) {    // Need to evict
         printf("%s\n", "Page fault! Victim page contents:");
-        int r = rand() % (partition / 3);
+        int r = history_LRU();
         printf("%s", shellmemory[r * 3].value);
         printf("%s", shellmemory[r * 3 + 1].value);
         printf("%s", shellmemory[r * 3 + 2].value);
@@ -291,6 +297,7 @@ int schedule(int policy) {
                 break;
             } else
                 parseInput(shellmemory[frame_num + (i % 3)].value);
+            history_write(frame_num);
         }
         if (page_fault == 0) {
             if (startAt + 2 >= length) {   // program complete
@@ -313,6 +320,7 @@ int schedule(int policy) {
             frame_load(cur, startAt / 3);
         } else
             parseInput(shellmemory[frame_num + (startAt % 3)].value);
+        history_write(frame_num);
         if (page_fault == 0) {
             if (startAt + 1 >= length) {   // program complete
                 dequeue();
@@ -355,12 +363,36 @@ int schedule(int policy) {
                 break;
             } else
                 parseInput(shellmemory[frame_num + (i % 3)].value);
+            history_write(frame_num);
         }
         if (page_fault == 0)
             dequeue();
         page_fault = 0;
     }
     return schedule(policy);
+}
+
+void history_write(int frame_number) {
+    for (int i = 0; i < history_tail; i++) {
+        if (framehistory[i] == frame_number)
+            framehistory[i] = -1;
+    }
+    framehistory[history_tail] = frame_number;
+    history_tail++;
+}
+
+int history_LRU() {
+    int i;
+    for (i = 0; i < history_tail; i++) {
+        if (framehistory[i] != -1)
+            break;
+    }
+    int LRU = framehistory[i];
+    for (i = 0; i < history_tail; i++) {
+        if (framehistory[i] == LRU)
+            framehistory[i] = -1;
+    }
+    return LRU;
 }
 
 void cleanup(PCB *process) {
