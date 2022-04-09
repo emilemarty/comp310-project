@@ -260,7 +260,6 @@ void dequeue() {
 }
 
 int schedule(int policy) {
-    char buffer[18];
     PCB *cur = &head;
 
     if (cur->nextProc == NULL) {    // base case

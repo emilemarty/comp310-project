@@ -280,6 +280,7 @@ int exec(char *scripts[3], int length, int policy) {
             }
             fgets(line, 999, p);
         }
+        fputs("\n", b);
         fclose(p);
         int length = line_number - start;
         newProcess[i]->length = length;
